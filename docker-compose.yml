@@ -1,0 +1,49 @@
+# Example docker-compose configuration for OpenLibry with demo data seeding
+#
+# Usage:
+#   docker-compose up -d openlibry    # Start OpenLibry
+#   docker-compose run --rm seeder    # Seed demo data (run once)
+#
+# Or to run everything at once:
+#   docker-compose up
+
+version: '3.8'
+
+services:
+  # Main OpenLibry application
+  openlibry:
+    image: jzakotnik/openlibry:latest
+    container_name: openlibry-demo
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/library.db
+    volumes:
+      - openlibry-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Demo data seeder (run once after openlibry is ready)
+  seeder:
+    image: openlibry-demo-seeder:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      openlibry:
+        condition: service_healthy
+    environment:
+      - OPENLIBRY_URL=http://openlibry:3000
+      - WAIT_TIMEOUT=120
+      - SKIP_COVERS=false
+    # Container exits after seeding, so we use "run" not "up"
+    profiles:
+      - seed
+
+volumes:
+  openlibry-data:
